@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QToolBar,
     QStatusBar,
+    QMessageBox,
 )
 from PyQt6.QtGui import QAction, QIcon
 import sys
@@ -37,6 +38,7 @@ class MainWindow(QMainWindow):
         about_action = QAction("About", self)
         help_menu_item.addAction(about_action)
         about_action.setMenuRole(QAction.MenuRole.NoRole)
+        about_action.triggered.connect(self.about)
 
         search_action = QAction(QIcon("icons/search.png"), "Search", self)
         edit_menu_item.addAction(search_action)
@@ -106,6 +108,20 @@ class MainWindow(QMainWindow):
         dialog = DeleteDialog()
         dialog.exec()
 
+    def about(self):
+        dialog = AboutDialog()
+        dialog.exec()
+
+
+class AboutDialog(QMessageBox):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("About")
+        content = """
+        This app was created by Rikuto Mikado.
+        """
+        self.setText(content)
+
 
 class EditDialog(QDialog):
     def __init__(self):
@@ -124,7 +140,7 @@ class EditDialog(QDialog):
         self.student_id = main_window.table.item(index, 0).text()
 
         # Add student name widget
-        self.student_name = QLineEdit()
+        self.student_name = QLineEdit(student_name)
         self.student_name.setPlaceholderText("Name")
         layout.addWidget(self.student_name)
 
@@ -170,7 +186,41 @@ class EditDialog(QDialog):
 
 
 class DeleteDialog(QDialog):
-    pass
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Delete Student Data")
+
+        layout = QGridLayout()
+        confirmation = QLabel("Are you sure you want to delete this record?")
+        yes = QPushButton("Yes")
+        no = QPushButton("No")
+
+        layout.addWidget(confirmation, 0, 0, 1, 2)
+        layout.addWidget(yes, 1, 0)
+        layout.addWidget(no, 1, 1)
+        self.setLayout(layout)
+
+        yes.clicked.connect(self.delete_student)
+
+    def delete_student(self):
+        # Get selected row index and student id
+        index = main_window.table.currentRow()
+        self.student_id = main_window.table.item(index, 0).text()
+
+        connection = sqlite3.connect("database.db")
+        cursor = connection.cursor()
+        cursor.execute("DELETE from students WHERE id = ?", (self.student_id,))
+        connection.commit()
+        cursor.close()
+        connection.close()
+        main_window.load_data()
+
+        self.close()
+
+        confirmation_widget = QMessageBox()
+        confirmation_widget.setWindowTitle("Success")
+        confirmation_widget.setText("Record deleted successfully")
+        confirmation_widget.exec()
 
 
 class InsertDialog(QDialog):
@@ -244,18 +294,16 @@ class SearchDialog(QDialog):
 
     def search(self):
         name = self.student_name.text()
-        connection = sqlite3.connect("database.db")
-        cursor = connection.cursor()
-        result = cursor.execute("SELECT * FROM students WHERE name = ?", (name,))
-        row = list(result)[0]
-        print(row)
-        items = main_window.table.findItems("John Smith", Qt.MatchFlag.MatchFixedString)
-        for item in items:
-            print(item)
-            main_window.table.item(item.row(), 1).setSelected(True)
-
-        cursor.close()
-        connection.close()
+        items = main_window.table.findItems(name, Qt.MatchFlag.MatchFixedString)
+        if items:
+            for item in items:
+                main_window.table.item(item.row(), 1).setSelected(True)
+            self.close()
+        else:
+            not_found_message = QMessageBox()
+            not_found_message.setWindowTitle("Not Found")
+            not_found_message.setText("The student was not found.")
+            not_found_message.exec()
 
 
 app = QApplication(sys.argv)
