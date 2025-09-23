@@ -21,6 +21,15 @@ import sys
 import sqlite3
 
 
+class DatabaseConnection:
+    def __init__(self, database_file="database.db"):
+        self.database_file = database_file
+
+    def connect(self):
+        connection = sqlite3.connect(self.database_file)
+        return connection
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -81,7 +90,7 @@ class MainWindow(QMainWindow):
         self.statusbar.addWidget(delete_button)
 
     def load_data(self):
-        connection = sqlite3.connect("database.db")
+        connection = DatabaseConnection().connect()
         result = connection.execute("SELECT * FROM students")
         self.table.setRowCount(0)
         for row_number, row_data in enumerate(result):
@@ -166,7 +175,7 @@ class EditDialog(QDialog):
         self.setLayout(layout)
 
     def update_student(self):
-        connection = sqlite3.connect("database.db")
+        connection = DatabaseConnection().connect()
         cursor = connection.cursor()
         cursor.execute(
             "UPDATE students SET name = ?, course = ?, mobile = ? WHERE id = ?",
@@ -207,7 +216,7 @@ class DeleteDialog(QDialog):
         index = main_window.table.currentRow()
         self.student_id = main_window.table.item(index, 0).text()
 
-        connection = sqlite3.connect("database.db")
+        connection = DatabaseConnection().connect()
         cursor = connection.cursor()
         cursor.execute("DELETE from students WHERE id = ?", (self.student_id,))
         connection.commit()
@@ -294,6 +303,11 @@ class SearchDialog(QDialog):
 
     def search(self):
         name = self.student_name.text()
+        connection = DatabaseConnection().connect()
+        cursor = connection.cursor()
+        result = cursor.execute("SELECT * FROM students WHERE name =?", (name,))
+        rows = list(result)
+        print(rows)
         items = main_window.table.findItems(name, Qt.MatchFlag.MatchFixedString)
         if items:
             for item in items:
